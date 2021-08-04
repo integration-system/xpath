@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	html  = example()
-	html2 = example2()
+	html   = example()
+	html2  = example2()
+	htmlRu = example3()
 )
 
 func TestCompile(t *testing.T) {
@@ -29,6 +30,10 @@ func TestCompile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("/a/b/(c, .[not(c)]) should be correct but got error %s", err)
 	}
+	_, err = Compile("//Путь/До/Тега")
+	if err != nil {
+		t.Fatalf("//Путь/До/Тега should be correct but got error %s", err)
+	}
 }
 
 func TestMustCompile(t *testing.T) {
@@ -48,23 +53,34 @@ func TestMustCompile(t *testing.T) {
 
 func TestSelf(t *testing.T) {
 	testXPath(t, html, ".", "html")
+	testXPath(t, htmlRu, ".", "хтмл")
 	testXPath(t, html.FirstChild, ".", "head")
+	testXPath(t, htmlRu.FirstChild, ".", "голова")
 	testXPath(t, html, "self::*", "html")
+	testXPath(t, htmlRu, "self::*", "хтмл")
 	testXPath(t, html.LastChild, "self::body", "body")
+	testXPath(t, htmlRu.LastChild, "self::тело", "тело")
 	testXPath2(t, html, "//body/./ul/li/a", 3)
+	testXPath2(t, htmlRu, "//тело/заголовок/содержание", 1)
+	testXPath2(t, htmlRu, "//заголовок/содержание", 2)
 }
 
 func TestParent(t *testing.T) {
 	testXPath(t, html.LastChild, "..", "html")
+	testXPath(t, htmlRu.LastChild, "..", "хтмл")
 	testXPath(t, html.LastChild, "parent::*", "html")
+	testXPath(t, htmlRu.LastChild, "parent::*", "хтмл")
 	a := selectNode(html, "//li/a")
 	testXPath(t, a, "parent::*", "li")
 	testXPath(t, html, "//title/parent::head", "head")
+	testXPath(t, htmlRu, "//заголовок/parent::голова", "голова")
 }
 
 func TestAttribute(t *testing.T) {
 	testXPath(t, html, "@lang='en'", "html")
+	testXPath(t, htmlRu, "@язык='Русский'", "хтмл")
 	testXPath2(t, html, "@lang='zh'", 0)
+	testXPath2(t, htmlRu, "@язык='Белорусский'", 0)
 	testXPath2(t, html, "//@href", 3)
 	testXPath2(t, html, "//a[@*]", 3)
 }
@@ -76,14 +92,22 @@ func TestSequence(t *testing.T) {
 
 func TestRelativePath(t *testing.T) {
 	testXPath(t, html, "head", "head")
+	testXPath(t, htmlRu, "голова", "голова")
 	testXPath(t, html, "/head", "head")
+	testXPath(t, htmlRu, "/голова", "голова")
 	testXPath(t, html, "body//li", "li")
+	testXPath(t, htmlRu, "тело//содержание", "содержание")
 	testXPath(t, html, "/head/title", "title")
+	testXPath(t, htmlRu, "/голова/заголовок", "заголовок")
 
 	testXPath2(t, html, "/body/ul/li/a", 3)
+	testXPath2(t, htmlRu, "/тело/иной_тег", 1)
 	testXPath(t, html, "//title", "title")
+	testXPath(t, htmlRu, "//иной_тег", "иной_тег")
 	testXPath(t, html, "//title/..", "head")
+	testXPath(t, htmlRu, "//иной_тег/..", "тело")
 	testXPath(t, html, "//title/../..", "html")
+	testXPath(t, htmlRu, "//иной_тег/../..", "хтмл")
 	testXPath2(t, html, "//a[@href]", 3)
 	testXPath(t, html, "//ul/../footer", "footer")
 }
@@ -97,6 +121,7 @@ func TestChild(t *testing.T) {
 
 func TestDescendant(t *testing.T) {
 	testXPath2(t, html, "descendant::*", 15)
+	testXPath2(t, htmlRu, "descendant::*", 7)
 	testXPath2(t, html, "/head/descendant::*", 2)
 	testXPath2(t, html, "//ul/descendant::*", 7)  // <li> + <a>
 	testXPath2(t, html, "//ul/descendant::li", 4) // <li>
@@ -161,8 +186,10 @@ func TestStarWide(t *testing.T) {
 
 func TestNodeTestType(t *testing.T) {
 	testXPath(t, html, "//title/text()", "Hello")
+	testXPath(t, htmlRu, "//голова/заголовок/содержание/text()", "Привет, мир!")
 	testXPath(t, html, "//a[@href='/']/text()", "Home")
 	testXPath2(t, html, "//head/node()", 2)
+	testXPath2(t, htmlRu, "//тело/node()", 2)
 	testXPath2(t, html, "//ul/node()", 4)
 }
 
@@ -618,6 +645,41 @@ func (n *TNode) appendNode(data string, typ NodeType) *TNode {
 
 func (n *TNode) addAttribute(k, v string) {
 	n.Attr = append(n.Attr, Attribute{k, v})
+}
+
+func example3() *TNode {
+	/*
+			<хтмл язык="Русский">
+			   <голова>
+				   <заголовок>
+		           		<содержание>Привет, мир!<содержание/>
+		           </заголовок>
+			   </голова>
+		       <тело>
+		           <заголовок>
+		                <содержание>Привет, мир!<содержание/>
+		           </заголовок>
+		           <иной_тег>Доброе утро, мир!</иной_тег>
+		       </тело>
+			</хтмл>
+	*/
+	doc := createNode("", RootNode)
+	xhtml := doc.createChildNode("хтмл", ElementNode)
+	xhtml.addAttribute("язык", "Русский")
+
+	// The HTML head section.
+	head := xhtml.createChildNode("голова", ElementNode)
+	n := head.createChildNode("заголовок", ElementNode)
+	content := n.createChildNode("содержание", ElementNode)
+	n = content.createChildNode("Привет, мир!", TextNode)
+	body := xhtml.createChildNode("тело", ElementNode)
+	n = body.createChildNode("заголовок", ElementNode)
+	contentBody := n.createChildNode("содержание", ElementNode)
+	n = contentBody.createChildNode("Прощай, мир!", TextNode)
+	n = body.createChildNode("иной_тег", ElementNode).
+		createChildNode("Доброе утро, мир!", TextNode)
+
+	return xhtml
 }
 
 func example2() *TNode {
