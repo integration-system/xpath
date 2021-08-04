@@ -1,4 +1,4 @@
-module github.com/integration-system/xpath
+module github.com/antchfx/xpath
 
 go 1.16
 
