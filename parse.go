@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"unicode"
+
+	"golang.org/x/exp/utf8string"
 )
 
 // A XPath expression token type.
@@ -152,7 +154,7 @@ func isStep(item itemType) bool {
 
 func checkItem(r *scanner, typ itemType) {
 	if r.typ != typ {
-		panic(fmt.Sprintf("%s has an invalid token", string(r.text)))
+		panic(fmt.Sprintf("%s has an invalid token", r.text.String()))
 	}
 }
 
@@ -532,7 +534,7 @@ func (p *parser) parseMethod(n node) node {
 
 // Parse parsing the XPath express string expr and returns a tree node.
 func parse(expr string) node {
-	r := &scanner{text: []rune(expr)}
+	r := &scanner{text: utf8string.NewString(expr)}
 	r.nextChar()
 	r.nextItem()
 	p := &parser{r: r}
@@ -653,7 +655,7 @@ func (f *functionNode) String() string {
 
 type scanner struct {
 	name, prefix string
-	text         []rune
+	text         *utf8string.String
 	pos          int
 	curr         rune
 	typ          itemType
@@ -663,11 +665,11 @@ type scanner struct {
 }
 
 func (s *scanner) nextChar() bool {
-	if s.pos >= len(s.text) {
+	if s.pos >= s.text.RuneCount() {
 		s.curr = rune(0)
 		return false
 	}
-	s.curr = s.text[s.pos]
+	s.curr = s.text.At(s.pos)
 	s.pos++
 	return true
 }
@@ -747,7 +749,7 @@ func (s *scanner) nextItem() bool {
 					} else if isName(s.curr) {
 						s.name = s.scanName()
 					} else {
-						panic(fmt.Sprintf("%s has an invalid qualified name.", string(s.text)))
+						panic(fmt.Sprintf("%s has an invalid qualified name.", s.text.String()))
 					}
 				}
 			} else {
@@ -759,14 +761,14 @@ func (s *scanner) nextItem() bool {
 						s.nextChar()
 						s.typ = itemAxe
 					} else {
-						panic(fmt.Sprintf("%s has an invalid qualified name.", string(s.text)))
+						panic(fmt.Sprintf("%s has an invalid qualified name.", s.text.String()))
 					}
 				}
 			}
 			s.skipSpace()
 			s.canBeFunc = s.curr == '('
 		} else {
-			panic(fmt.Sprintf("%s has an invalid token.", string(s.text)))
+			panic(fmt.Sprintf("%s has an invalid token.", s.text.String()))
 		}
 	}
 	return true
@@ -790,7 +792,7 @@ func (s *scanner) scanFraction() float64 {
 		s.nextChar()
 		c++
 	}
-	v, err := strconv.ParseFloat(string(s.text[i:i+c]), 64)
+	v, err := strconv.ParseFloat(s.text.Slice(i, i+c), 64)
 	if err != nil {
 		panic(fmt.Errorf("xpath: scanFraction parse float got error: %v", err))
 	}
@@ -814,7 +816,7 @@ func (s *scanner) scanNumber() float64 {
 			c++
 		}
 	}
-	v, err := strconv.ParseFloat(string(s.text[i:i+c]), 64)
+	v, err := strconv.ParseFloat(s.text.Slice(i, i+c), 64)
 	if err != nil {
 		panic(fmt.Errorf("xpath: scanNumber parse float got error: %v", err))
 	}
@@ -835,7 +837,7 @@ func (s *scanner) scanString() string {
 		c++
 	}
 	s.nextChar()
-	return string(s.text[i : i+c])
+	return s.text.Slice(i, i+c)
 }
 
 func (s *scanner) scanName() string {
@@ -849,7 +851,7 @@ func (s *scanner) scanName() string {
 			break
 		}
 	}
-	return string(s.text[i : i+c])
+	return s.text.Slice(i, i+c)
 }
 
 func isName(r rune) bool {
